@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 pub use builder::SsTableBuilder;
-use bytes::{Buf, Bytes};
+use bytes::{Buf, BufMut, Bytes};
 pub use iterator::SsTableIterator;
 
 use crate::block::Block;
@@ -25,12 +25,21 @@ pub struct BlockMeta {
 
 impl BlockMeta {
     /// Encode block meta to a buffer.
-    pub fn encode_block_meta(
-        block_meta: &[BlockMeta],
-        #[allow(clippy::ptr_arg)] // remove this allow after you finish
-        buf: &mut Vec<u8>,
-    ) {
-        unimplemented!()
+    pub fn encode_block_meta(block_meta: &[BlockMeta], buf: &mut Vec<u8>) {
+        let mut estimated_size = 0;
+        for meta in block_meta {
+            estimated_size += std::mem::size_of::<u32>();
+            estimated_size += std::mem::size_of::<u16>();
+            estimated_size += meta.first_key.len();
+        }
+        buf.reserve(estimated_size);
+        let original_len = buf.len();
+        for meta in block_meta {
+            buf.put_u32(meta.offset as u32);
+            buf.put_u16(meta.first_key.len() as u16);
+            buf.put_slice(&meta.first_key);
+        }
+        assert_eq!(estimated_size, buf.len() - original_len);
     }
 
     /// Decode block meta from a buffer.
@@ -53,7 +62,7 @@ impl FileObject {
 
     /// Create a new file object (day 2) and write the file to the disk (day 4).
     pub fn create(path: &Path, data: Vec<u8>) -> Result<Self> {
-        unimplemented!()
+        Ok(FileObject(data.into()))
     }
 
     pub fn open(path: &Path) -> Result<Self> {
